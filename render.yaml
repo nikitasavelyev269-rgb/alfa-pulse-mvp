@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: alfa-pulse-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alfa-pulse-db
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: "*"
+databases:
+  - name: alfa-pulse-db
+    plan: basic-256mb
