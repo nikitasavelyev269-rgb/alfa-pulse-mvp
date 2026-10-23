@@ -18,8 +18,6 @@ class Application(Base):
     term_months: Mapped[int] = mapped_column(Integer, nullable=False)
     monthly_revenue: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="submitted")
-
-    # Original client comment; keep separate from the employee's comment.
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     staff_comment: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 

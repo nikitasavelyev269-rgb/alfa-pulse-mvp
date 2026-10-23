@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
@@ -19,9 +19,12 @@ from .schemas import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Creates missing tables. It does NOT add columns to existing tables;
-    # apply migrations/add_staff_comment.sql once to an existing PostgreSQL database.
+    # Create missing tables and add the comment column to an existing database.
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE applications ADD COLUMN IF NOT EXISTS staff_comment TEXT")
+        )
     yield
 
 
@@ -31,7 +34,7 @@ app = FastAPI(
         "Демонстрационный backend кредитного навигатора ALFA PULSE. "
         "Не является банковской системой."
     ),
-    version="0.2.0",
+    version="0.2.1",
     lifespan=lifespan,
 )
 
@@ -97,12 +100,12 @@ def update_application_status(
 
     item.status = payload.status
 
-    # Only change the employee comment when the field was supplied in the request.
-    # An omitted field preserves the previous comment; an explicit null clears it.
+    # If staff_comment is omitted, preserve its current value.
+    # If explicitly null, clear it.
     if "staff_comment" in payload.model_fields_set:
         item.staff_comment = payload.staff_comment
 
-    # Keep backward compatibility, without mixing notes and staff_comment.
+    # Keep client notes separate; support old callers that explicitly send notes.
     if "notes" in payload.model_fields_set:
         item.notes = payload.notes
 

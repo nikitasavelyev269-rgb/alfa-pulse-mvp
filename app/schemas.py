@@ -37,9 +37,8 @@ class ApplicationCreate(BaseModel):
 
 class ApplicationStatusUpdate(BaseModel):
     status: str
-    # Public-facing comment from the employee. Keep client notes separate.
     staff_comment: str | None = Field(default=None, max_length=5000)
-    # Backward compatibility for existing clients that may still update notes.
+    # Retain compatibility with earlier clients; client notes stay separate.
     notes: str | None = Field(default=None, max_length=5000)
 
     @field_validator("status")
