@@ -1,11 +1,19 @@
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ALLOWED_PRODUCTS = {"working_capital", "overdraft"}
 ALLOWED_STATUSES = {
-    "submitted", "in_review", "need_documents", "offer_ready",
-    "approved_demo", "rejected_demo", "contract_demo", "disbursed_demo"
+    "submitted",
+    "in_review",
+    "need_documents",
+    "offer_ready",
+    "approved_demo",
+    "rejected_demo",
+    "contract_demo",
+    "disbursed_demo",
 }
+
 
 class ApplicationCreate(BaseModel):
     company_name: str = Field(min_length=2, max_length=200)
@@ -21,22 +29,32 @@ class ApplicationCreate(BaseModel):
     @classmethod
     def product_must_be_supported(cls, value):
         if value not in ALLOWED_PRODUCTS:
-            raise ValueError(f"product_type must be one of: {', '.join(sorted(ALLOWED_PRODUCTS))}")
+            raise ValueError(
+                f"product_type must be one of: {', '.join(sorted(ALLOWED_PRODUCTS))}"
+            )
         return value
+
 
 class ApplicationStatusUpdate(BaseModel):
     status: str
+    # Public-facing comment from the employee. Keep client notes separate.
+    staff_comment: str | None = Field(default=None, max_length=5000)
+    # Backward compatibility for existing clients that may still update notes.
     notes: str | None = Field(default=None, max_length=5000)
 
     @field_validator("status")
     @classmethod
     def status_must_be_supported(cls, value):
         if value not in ALLOWED_STATUSES:
-            raise ValueError(f"status must be one of: {', '.join(sorted(ALLOWED_STATUSES))}")
+            raise ValueError(
+                f"status must be one of: {', '.join(sorted(ALLOWED_STATUSES))}"
+            )
         return value
+
 
 class ApplicationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_name: str
     inn: str | None
@@ -47,8 +65,10 @@ class ApplicationRead(BaseModel):
     monthly_revenue: float | None
     status: str
     notes: str | None
+    staff_comment: str | None = None
     created_at: datetime
     updated_at: datetime
+
 
 class SimulationRequest(BaseModel):
     amount: float = Field(gt=0, le=100_000_000)
@@ -57,6 +77,7 @@ class SimulationRequest(BaseModel):
     monthly_revenue: float = Field(ge=0, le=1_000_000_000)
     monthly_expenses: float = Field(ge=0, le=1_000_000_000)
     existing_monthly_debt: float = Field(ge=0, le=1_000_000_000, default=0)
+
 
 class SimulationRead(BaseModel):
     estimated_monthly_payment: float

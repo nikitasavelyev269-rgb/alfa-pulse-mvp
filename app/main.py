@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
@@ -8,20 +9,29 @@ from sqlalchemy.orm import Session
 from .database import Base, engine, get_db
 from . import models
 from .schemas import (
-    ApplicationCreate, ApplicationRead, ApplicationStatusUpdate,
-    SimulationRequest, SimulationRead
+    ApplicationCreate,
+    ApplicationRead,
+    ApplicationStatusUpdate,
+    SimulationRequest,
+    SimulationRead,
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Convenient for a demo starter. Use Alembic migrations before production use.
+    # Creates missing tables. It does NOT add columns to existing tables;
+    # apply migrations/add_staff_comment.sql once to an existing PostgreSQL database.
     Base.metadata.create_all(bind=engine)
     yield
 
+
 app = FastAPI(
     title="ALFA PULSE API",
-    description="Демонстрационный backend кредитного навигатора ALFA PULSE. Не является банковской системой.",
-    version="0.1.0",
+    description=(
+        "Демонстрационный backend кредитного навигатора ALFA PULSE. "
+        "Не является банковской системой."
+    ),
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -34,13 +44,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def root():
     return {"service": "ALFA PULSE API", "docs": "/docs", "health": "/health"}
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/api/applications", response_model=ApplicationRead, status_code=201)
 def create_application(payload: ApplicationCreate, db: Session = Depends(get_db)):
@@ -49,6 +62,7 @@ def create_application(payload: ApplicationCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(item)
     return item
+
 
 @app.get("/api/applications", response_model=list[ApplicationRead])
 def list_applications(
@@ -62,12 +76,14 @@ def list_applications(
         stmt = stmt.where(models.Application.status == status)
     return list(db.scalars(stmt.offset(offset).limit(limit)).all())
 
+
 @app.get("/api/applications/{application_id}", response_model=ApplicationRead)
 def get_application(application_id: int, db: Session = Depends(get_db)):
     item = db.get(models.Application, application_id)
     if not item:
         raise HTTPException(status_code=404, detail="Application not found")
     return item
+
 
 @app.patch("/api/applications/{application_id}/status", response_model=ApplicationRead)
 def update_application_status(
@@ -78,12 +94,22 @@ def update_application_status(
     item = db.get(models.Application, application_id)
     if not item:
         raise HTTPException(status_code=404, detail="Application not found")
+
     item.status = payload.status
-    if payload.notes is not None:
+
+    # Only change the employee comment when the field was supplied in the request.
+    # An omitted field preserves the previous comment; an explicit null clears it.
+    if "staff_comment" in payload.model_fields_set:
+        item.staff_comment = payload.staff_comment
+
+    # Keep backward compatibility, without mixing notes and staff_comment.
+    if "notes" in payload.model_fields_set:
         item.notes = payload.notes
+
     db.commit()
     db.refresh(item)
     return item
+
 
 @app.post("/api/finance/simulate", response_model=SimulationRead)
 def simulate_finance(payload: SimulationRequest):
@@ -94,15 +120,22 @@ def simulate_finance(payload: SimulationRequest):
     else:
         factor = (1 + monthly_rate) ** payload.term_months
         payment = payload.amount * monthly_rate * factor / (factor - 1)
+
     total = payment * payload.term_months
-    before = payload.monthly_revenue - payload.monthly_expenses - payload.existing_monthly_debt
+    before = (
+        payload.monthly_revenue
+        - payload.monthly_expenses
+        - payload.existing_monthly_debt
+    )
     after = before - payment
+
     if after < 0:
         status = "cash_gap_risk"
     elif after < payload.monthly_revenue * 0.1:
         status = "low_buffer"
     else:
         status = "positive_buffer"
+
     return SimulationRead(
         estimated_monthly_payment=round(payment, 2),
         estimated_total_repayment=round(total, 2),
@@ -110,5 +143,8 @@ def simulate_finance(payload: SimulationRequest):
         monthly_cash_before_new_loan=round(before, 2),
         monthly_cash_after_new_loan=round(after, 2),
         cash_flow_status=status,
-        disclaimer="Демо-расчёт по упрощённой аннуитетной формуле. Не является кредитным решением или банковским предложением.",
+        disclaimer=(
+            "Демо-расчёт по упрощённой аннуитетной формуле. "
+            "Не является кредитным решением или банковским предложением."
+        ),
     )
