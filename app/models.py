@@ -1,8 +1,3 @@
-from datetime import datetime, timezone
-from sqlalchemy import DateTime, Integer, String, Text, Numeric
-from sqlalchemy.orm import Mapped, mapped_column
-from .database import Base
-
 class Application(Base):
     __tablename__ = "applications"
 
@@ -15,12 +10,19 @@ class Application(Base):
     term_months: Mapped[int] = mapped_column(Integer, nullable=False)
     monthly_revenue: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="submitted")
+
+    # notes stores the client's original comment. Keep it separate from staff_comment.
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    staff_comment: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False,
+        DateTime(timezone=True),
+        nullable=False,
         default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        onupdate=lambda: datetime.now(timezone.utc),
     )
